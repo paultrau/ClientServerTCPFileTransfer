@@ -16,6 +16,7 @@
 #define SERVER_NAME "127.0.0.1"
 #define SIZE 1024
 #define MAX_LINE 80
+#define HEADER_SIZE 4
 
 struct Header {
     short count;
@@ -25,14 +26,16 @@ struct Header {
 void sendFile(int socket, char* filename);
 void sendPacket(int socket, int sN, char* buffer);
 
-void sendFile(int socket, char* filename){
+void sendFile(int socket, char* filename)
+{
     FILE* theFile = fopen(filename, "r");
     char buffer[MAX_LINE +1];
     short int sN = 0;
     int bytes = 0;
+
     while(fgets(buffer,MAX_LINE+1,theFile)){
         sendPacket(socket, sN++, buffer);
-        bytes = bytes + strlen(buffer);
+        bytes = bytes + strlen(buffer) + HEADER_SIZE;
     }
     sendPacket(socket,sN,"");
     fclose(theFile);
@@ -42,17 +45,21 @@ void sendFile(int socket, char* filename){
 
 void sendPacket(int socket, int sN, char* buffer){
     struct Header header;
+    int* x;
     header.count = htons(strlen(buffer));
     header.sequence = htons(sN);
     send(socket, &header, sizeof(header),0);
     send(socket, buffer, strlen(buffer),0);
-
     if (strlen(buffer)>0){
-        printf("Server: Packet %d transmitted with %lu data bytes\n",sN, strlen(buffer));
+        printf("Server: Packet %d transmitted with %lu data bytes \n",sN, strlen(buffer)+HEADER_SIZE);
+
     }
     else{
-        printf("Server: End of transmission packet with sequence number %d transmitted with %lu data bytes\n",sN,strlen(buffer));
+        printf("Server: End of transmission packet with sequence number %d transmitted with %lu data bytes\n",sN,strlen(buffer)+HEADER_SIZE);
     }
+    printf("Server: Waiting for confirmation...\n");
+    int counter = recv(socket,x,sizeof(int),0);
+    printf("Server: Confirmation received!\n");
 }
 
 int main(){
@@ -63,7 +70,7 @@ int main(){
     unsigned short portNumber;
     
     struct sockaddr_in incomingAddress;
-    socklen_t addressSize;
+    unsigned int addressSize;
 
     char incomingData[SIZE];
     char modData[SIZE];
@@ -105,7 +112,8 @@ int main(){
         close(newSocket);
         exit(1);
     }
-
+    printf("Server: Data accepted!\n");
+    
     //recieve filename
     recievedBytes = recv(newSocket,incomingData, SIZE,0);
     sendFile(newSocket, incomingData);

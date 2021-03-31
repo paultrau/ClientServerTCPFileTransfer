@@ -15,6 +15,7 @@
 #define SERVER_NAME "127.0.0.1"
 #define SIZE 1024
 #define MAX_LINE 80
+#define HEADER_SIZE 4
 
 struct Header {
     short count;
@@ -22,8 +23,8 @@ struct Header {
 };
 
 int sendFilename(int socket, char filename[SIZE]);
-void gatherText(char line[MAX_LINE+1],char** set);
-int countSent, countReceived, byteTotal;
+void gatherText(char buffer[MAX_LINE+1],char** theData);
+int countSent, countHeader, countData, byteTotal;
 FILE* outputFile;
 
 int lineNum;
@@ -38,35 +39,31 @@ int sendFilename(int socket, char filename[SIZE]){
 }
 
 //adds line of text to output file at the current line number
-void gatherText(char line[MAX_LINE+1], char** set){
-    set[lineNum++] = &line;
+void gatherText(char buffer[MAX_LINE+1], char** theData){
+    theData[lineNum] = buffer;
+    lineNum++;
 }
 
 //sets each string in the array to its own line in the output file
 void finalizeFile(){
-    
+    printf("Client: Finalizing File...\n");
+    char* test = dataSet[0];
+    printf("Data:%s\n",test);
+
 }
 
-int main(){
-    outputFile = fopen("out.txt", "w");
-    //initialize cleint data
-    int port = SERVER_PORT;
-    int sequence;
-    
-    int clientSocket;
+int findServer()
+{
+    int openSocket;
     struct sockaddr_in serverAddress;
     struct hostent * serverIP;
 
     char serverHostname[SIZE];
     unsigned short serverPort;
 
-    char filename[SIZE];
-    printf("Enter name of file to be transferred:\n");
-    scanf("%s",filename);
-
     //Initializing TCP Socket
 
-    if ((clientSocket = socket(AF_INET, SOCK_STREAM,IPPROTO_TCP)) < 0){
+    if ((openSocket = socket(AF_INET, SOCK_STREAM,IPPROTO_TCP)) < 0){
         perror("Client: Error opening socket");
         exit(1);
     }
@@ -79,14 +76,30 @@ int main(){
     memcpy( (char *)&serverAddress.sin_addr, serverIP->h_addr, serverIP->h_length);
     serverAddress.sin_port = htons(SERVER_PORT);
 
-    if (connect(clientSocket,(struct sockaddr*)&serverAddress, sizeof(serverAddress))<0){
+    //connecting to server
+
+    if (connect(openSocket,(struct sockaddr*)&serverAddress, sizeof(serverAddress))<0){
         perror("Client: Can't connect to server");
-        close(clientSocket);
+        close(openSocket);
         exit(1);
     }
     printf("Client: Connected to server\n");
+    return openSocket;
+}
 
-    if ((sendFilename(filename, clientSocket))<0)
+int main(){
+    outputFile = fopen("out.txt", "w");
+    //initialize cleint data
+    int port = SERVER_PORT;
+    int sequence;
+    int clientSocket;
+    char filename[SIZE];
+    printf("Enter name of file to be transferred:\n");
+    scanf("%s",filename);
+
+    clientSocket = findServer();
+
+    if ((sendFilename(clientSocket,filename))<0)
     {
         printf("Client: Error sending filename.\n");
         close(clientSocket);
@@ -95,30 +108,48 @@ int main(){
     printf("Client: Filename sent successfully\n");
 
     //variables for incoming data
-    char *line[MAX_LINE + 1];
+    char buffer[MAX_LINE + 1];
     struct Header headerBuff;
     struct Header *ptr = &headerBuff;
-    //waits for server response
-    countReceived = recv(clientSocket,ptr,sizeof(headerBuff),0);
-
+    short int sequenceBuff, localSequence;
+    
     //loops until the 0 count is sent from server
+    int flag=1;
     do{
-        sequence = headerBuff.sequence;
-        byteTotal = byteTotal + sizeof(headerBuff);
+        printf("Client: Receiving...\n");
+        //waits for server response
+        countHeader = recv(clientSocket,ptr,sizeof(headerBuff),0);
+        countData = recv(clientSocket, &buffer,sizeof(buffer),0);
+        printf("Client: Data incoming: %s\n",buffer);
 
-        countReceived = recv(clientSocket,line,sizeof(line),0);
-        gatherText(line, dataSet);
-        byteTotal = byteTotal + sizeof(line);
-        countReceived = recv(clientSocket,ptr,sizeof(headerBuff),0);
-        struct Header *ptr = &headerBuff;
-    }
-    while(countReceived > 0);
+        sequenceBuff = ptr->sequence;
+        localSequence = ntohs(sequenceBuff);
+        sequence = localSequence;
+        gatherText(buffer, dataSet);
+        byteTotal = byteTotal + sizeof(buffer) + HEADER_SIZE;
 
-    printf("Client: Total number of packets recieved = %d\n", sequence);
-    printf("Client: Total number of bytes recieved = %d\n", byteTotal);
+        if (strlen(buffer)>0)
+            printf("Client: Packet %d received with %lu data bytes\n",localSequence, strlen(buffer));
+        else{
+            flag=0;
+            printf("Client: End of transmission packet with sequence number %d received with %lu data bytes\n",headerBuff.sequence, strlen(buffer));
+        }
+       
+        printf("Client: Sending back confirmation...\n");
+        int* merc = &flag;
+        send(clientSocket,merc,sizeof(int*),0);
+        printf("Client: Confirmation sent!\n");
+
+    }while(flag==1);
+
+
+    printf("Client: Total number of packets received = %d\n", sequence);
+    printf("Client: Total number of bytes received = %d\n", byteTotal);
     
     finalizeFile();
     printf("Client: Closing connection...\n");
+
+
     close(clientSocket);
     
     return 0;

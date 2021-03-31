@@ -17,3 +17,10 @@ Compilation Instructions:
     Executables:
         ./server
         ./client
+
+To run the program one should:
+I. open two terminal windows and navigate to this directory.
+II. $ make all on either window
+III. $ ./server on either window (must run before client)
+IV. $ ./client on the other window 
+V. Observe terminal response.
