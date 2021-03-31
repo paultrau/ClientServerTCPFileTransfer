@@ -14,46 +14,6 @@
 #include "parallelTools.h"
 
 
-void sendFile(int socket, char* filename);
-void sendPacket(int socket, int sN, char* buffer);
-
-void sendFile(int socket, char* filename)
-{
-    FILE* theFile = fopen(filename, "r");
-    char buffer[MAX_LINE +1];
-    short int sN = 0;
-    int bytes = 0;
-
-    while(fgets(buffer,MAX_LINE+1,theFile)){
-        sendPacket(socket, sN++, buffer);
-        bytes = bytes + strlen(buffer) + HEADER_SIZE;
-    }
-    sendPacket(socket,sN,"");
-    fclose(theFile);
-    printf("Server: Total number of packets transmitted = %hd\n",sN+1);
-    printf("Server: Total number of data bytes = %d\n",bytes);
-}
-
-void sendPacket(int socket, int sN, char* buffer){
-    struct Header header;
-    header.count = htons(strlen(buffer));
-    header.sequence = htons(sN);
-    send(socket, &header, sizeof(header),0);
-    send(socket, buffer, strlen(buffer),0);
-    if (strlen(buffer)>0){
-        printf("Server: Packet %d transmitted with %lu data bytes \n",sN, strlen(buffer)+HEADER_SIZE);
-
-    }
-    else{
-        printf("Server: End of transmission packet with sequence number %d transmitted with %lu data bytes\n",sN,strlen(buffer)+HEADER_SIZE);
-    }
-    // int* x;
-    // int waitMachine;
-    // printf("Server: Waiting for confirmation...\n");
-    // waitMachine = recv(socket,x,sizeof(int),0);
-    // printf("Server: Confirmation received!\n");
-}
-
 int main(){
     int serverSocket;
     int newSocket;

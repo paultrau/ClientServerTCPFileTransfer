@@ -14,7 +14,6 @@
 
 
 int sendFilename(int socket, char filename[SIZE]);
-void gatherText(char buffer[MAX_LINE+1],char** theData);
 int countSent, countHeader, countData, byteTotal;
 FILE* outputFile;
 
@@ -29,20 +28,7 @@ int sendFilename(int socket, char filename[SIZE]){
     return countSent;
 }
 
-//adds line of text to output file at the current line number
-void gatherText(char buffer[MAX_LINE+1], char** theData){
-    theData[lineNum] = buffer;
-    lineNum++;
-    printf("Client: Data successfully added to data set \n");
-}
 
-//sets each string in the array to its own line in the output file
-void finalizeFile(){
-    printf("Client: Finalizing File...\n");
-    char* test = dataSet[0];
-    printf("Data:%s\n",test);
-
-}
 
 int findServer()
 {
@@ -121,7 +107,6 @@ int main(){
     printf("Client: Total number of packets received = %d\n", sequence);
     printf("Client: Total number of bytes received = %d\n", byteTotal);
     
-    finalizeFile();
     printf("Client: Closing connection...\n");
 
 
