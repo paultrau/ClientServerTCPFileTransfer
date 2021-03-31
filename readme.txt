@@ -24,3 +24,5 @@ II. $ make all on either window
 III. $ ./server on either window (must run before client)
 IV. $ ./client on the other window 
 V. Observe terminal response.
+
+Included in a successful output of the program running :D
