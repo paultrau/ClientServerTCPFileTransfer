@@ -10,17 +10,8 @@
 #include <netinet/in.h>     /* for sockaddr_in */
 #include <unistd.h>         /* for close */
 #include <arpa/inet.h>
+#include "parallelTools.h"
 
-#define SERVER_PORT 53801
-#define SERVER_NAME "127.0.0.1"
-#define SIZE 1024
-#define MAX_LINE 80
-#define HEADER_SIZE 4
-
-struct Header {
-    short count;
-    short sequence;
-};
 
 int sendFilename(int socket, char filename[SIZE]);
 void gatherText(char buffer[MAX_LINE+1],char** theData);
@@ -42,6 +33,7 @@ int sendFilename(int socket, char filename[SIZE]){
 void gatherText(char buffer[MAX_LINE+1], char** theData){
     theData[lineNum] = buffer;
     lineNum++;
+    printf("Client: Data successfully added to data set \n");
 }
 
 //sets each string in the array to its own line in the output file
@@ -107,41 +99,24 @@ int main(){
     }
     printf("Client: Filename sent successfully\n");
 
+
     //variables for incoming data
     char buffer[MAX_LINE + 1];
     struct Header headerBuff;
     struct Header *ptr = &headerBuff;
     short int sequenceBuff, localSequence;
-    
-    //loops until the 0 count is sent from server
-    int flag=1;
-    do{
-        printf("Client: Receiving...\n");
-        //waits for server response
-        countHeader = recv(clientSocket,ptr,sizeof(headerBuff),0);
-        countData = recv(clientSocket, &buffer,sizeof(buffer),0);
-        printf("Client: Data incoming: %s\n",buffer);
-
-        sequenceBuff = ptr->sequence;
-        localSequence = ntohs(sequenceBuff);
-        sequence = localSequence;
-        gatherText(buffer, dataSet);
-        byteTotal = byteTotal + sizeof(buffer) + HEADER_SIZE;
-
-        if (strlen(buffer)>0)
-            printf("Client: Packet %d received with %lu data bytes\n",localSequence, strlen(buffer));
-        else{
-            flag=0;
-            printf("Client: End of transmission packet with sequence number %d received with %lu data bytes\n",headerBuff.sequence, strlen(buffer));
-        }
-       
-        printf("Client: Sending back confirmation...\n");
-        int* merc = &flag;
-        send(clientSocket,merc,sizeof(int*),0);
-        printf("Client: Confirmation sent!\n");
-
-    }while(flag==1);
-
+    ReadPacket(clientSocket, &headerBuff, buffer);
+    while (headerBuff.count != 0)
+	{
+		sequence++;
+		byteTotal += headerBuff.count;
+		printf("Client: Packet %d received with %d data bytes\n", headerBuff.sequence, headerBuff.count);
+		if (!fputs(buffer, outputFile))
+			perror("fputs() failed");
+		
+		ReadPacket(clientSocket, &headerBuff, buffer);
+	}  
+    printf("Client: End of transmission packet with sequence number %d received with %lu data bytes\n",headerBuff.sequence, strlen(buffer)+HEADER_SIZE);
 
     printf("Client: Total number of packets received = %d\n", sequence);
     printf("Client: Total number of bytes received = %d\n", byteTotal);

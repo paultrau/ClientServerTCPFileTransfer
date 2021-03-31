@@ -11,17 +11,8 @@
 #include <unistd.h>         /* for close */
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "parallelTools.h"
 
-#define SERVER_PORT 53801
-#define SERVER_NAME "127.0.0.1"
-#define SIZE 1024
-#define MAX_LINE 80
-#define HEADER_SIZE 4
-
-struct Header {
-    short count;
-    short sequence;
-};
 
 void sendFile(int socket, char* filename);
 void sendPacket(int socket, int sN, char* buffer);
@@ -39,13 +30,12 @@ void sendFile(int socket, char* filename)
     }
     sendPacket(socket,sN,"");
     fclose(theFile);
-    printf("Server: Total number of packets transmitted = %hd\n",sN);
+    printf("Server: Total number of packets transmitted = %hd\n",sN+1);
     printf("Server: Total number of data bytes = %d\n",bytes);
 }
 
 void sendPacket(int socket, int sN, char* buffer){
     struct Header header;
-    int* x;
     header.count = htons(strlen(buffer));
     header.sequence = htons(sN);
     send(socket, &header, sizeof(header),0);
@@ -57,9 +47,11 @@ void sendPacket(int socket, int sN, char* buffer){
     else{
         printf("Server: End of transmission packet with sequence number %d transmitted with %lu data bytes\n",sN,strlen(buffer)+HEADER_SIZE);
     }
-    printf("Server: Waiting for confirmation...\n");
-    int counter = recv(socket,x,sizeof(int),0);
-    printf("Server: Confirmation received!\n");
+    // int* x;
+    // int waitMachine;
+    // printf("Server: Waiting for confirmation...\n");
+    // waitMachine = recv(socket,x,sizeof(int),0);
+    // printf("Server: Confirmation received!\n");
 }
 
 int main(){
@@ -116,7 +108,34 @@ int main(){
     
     //recieve filename
     recievedBytes = recv(newSocket,incomingData, SIZE,0);
-    sendFile(newSocket, incomingData);
+    FILE* file = fopen(incomingData, "r");
+
+	struct Header header;
+	char buffer[MAX_LINE + 1];
+	int sequence = 0;
+	int packets = 0;
+	int totalBytes = 0;
+
+
+    while (fgets(buffer, sizeof(buffer), file))
+        {
+            header.count = strlen(buffer) + 1;
+            header.sequence = sequence++;
+            WritePacket(newSocket, &header, buffer);
+            printf("Server: Packet %d transmitted with %d data bytes\n", header.sequence, header.count);
+            totalBytes += header.count;
+            packets++;
+        }
+
+    header.count = 0;
+	header.sequence = sequence++;
+
+	WritePacket(newSocket, &header, "");
+	printf("Server: End of Transmission Packet with sequence number %d transmitted with %d data bytes\n", header.sequence, strlen(""));
+	printf("Server: %d data packets transmitted\n", packets);
+	printf("Server: %d data bytes transmitted\n", totalBytes);
+	fclose(file);
+    
     printf("Server: Tranfer complete, closing sockets...\n");
     close(newSocket);
     close(serverSocket);
